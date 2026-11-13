@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#04070e">
+  <title>Как машина учится видеть · Мастер-класс по компьютерному зрению</title>
+  <meta name="description" content="Веб-презентация мастер-класса: как работает машинное зрение, от пикселя до свёрточной нейронной сети и классификации MNIST.">
+  <link rel="icon" type="image/png" href="assets/img/logo-untc.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="background" aria-hidden="true">
+    <canvas id="net-canvas"></canvas>
+    <div class="bg-grid"></div>
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="orb orb-c"></div>
+    <div class="noise"></div>
+  </div>
+
+  <header class="topbar">
+    <a class="brand" href="#slide-1" aria-label="В начало презентации">
+      <img src="assets/img/logo-vguit.png" alt="" class="brand-logo">
+      <span class="brand-rule"></span>
+      <span class="brand-copy">
+        <small>мастер-класс</small>
+      </span>
+    </a>
+    <div class="topbar-title">как работает машинное зрение</div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="btn-overview" type="button" title="Все слайды (O)" aria-label="Все слайды">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-help" type="button" title="Управление (?)" aria-label="Управление">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M9.4 9.2a2.7 2.7 0 1 1 3.9 2.4c-.8.4-1.3 1-1.3 1.9"/><path d="M12 17h.01"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-fullscreen" type="button" title="Полный экран (F)" aria-label="Полный экран">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="deck" id="deck">
+    <!-- 01 · TITLE -->
+    <section class="slide slide-hero is-active" id="slide-1" data-title="Титул" aria-label="Титульный слайд">
+      <div class="slide-inner hero">
+        <div class="hero-copy">
+          <p class="kicker reveal" style="--d:80">компьютерное зрение</p>
+          <h1 class="hero-title reveal" style="--d:150">Как машина<br><span class="grad">учится видеть</span></h1>
+          <p class="lead hero-lead reveal" style="--d:260">Разберём путь от одного пикселя до уверенного ответа нейросети — и соберём первую модель, которая распознаёт рукописные цифры.</p>
+          <div class="hero-meta reveal" style="--d:350">
+            <span class="chip"><i class="chip-dot"></i>MNIST · 70 000 изображений</span>
+            <span class="chip">CNN · 225 034 параметра</span>
+            <span class="chip">TensorFlow / Keras</span>
+          </div>
+          <div class="hero-author reveal" style="--d:450">
+            <span class="author-avatar"><img src="assets/img/logo-untc.png" alt="УИТС"></span>
+            <span><small>ведущий</small><strong>Небольсин Василий Дмитриевич</strong></span>
+          </div>
+        </div>
+
+        <div class="hero-visual reveal" style="--d:300">
+          <div class="vision-card">
+            <div class="vision-head">
+              <span class="mono">INPUT · 28×28×1</span>
+              <span class="live"><i></i>SCANNING</span>
+            </div>
+            <div class="pixel-frame">
+              <div class="pixel-grid" id="hero-grid" aria-hidden="true"></div>
+              <div class="scanline"></div>
+              <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+            </div>
+            <div class="vision-readout">
+              <div><span class="mono muted">СЛОЙ</span><strong>Conv 3×3</strong></div>
+              <div><span class="mono muted">ОТВЕТ</span><strong class="accent">7 · 99.2%</strong></div>
+            </div>
+            <div class="vision-pipeline">
+              <span>ПИКСЕЛИ</span><i></i><span>ПРИЗНАКИ</span><i></i><span class="accent">КЛАСС</span>
+            </div>
+          </div>
+          <div class="floating-tag tag-a mono">784 → 10</div>
+          <div class="floating-tag tag-b mono">σ(z) → P</div>
+        </div>
+      </div>
+      <div class="hero-hint mono">листайте стрелками →</div>
+    </section>
+
+    <!-- 02 · DEFINITION -->
+    <section class="slide" id="slide-2" data-title="Что такое компьютерное зрение" aria-label="Что такое компьютерное зрение">
+      <div class="slide-inner">
+        <div class="split split-definition">
+          <div class="copy">
+            <p class="kicker reveal" style="--d:60">01 · определение</p>
+            <h2 class="reveal" style="--d:130">Целая наука<br><span class="grad">работы с изображением</span></h2>
+            <p class="lead reveal" style="--d:220">Компьютерное зрение — область искусственного интеллекта, которая учится извлекать смысл из изображений и видео: находить объекты, понимать сцены и принимать решения.</p>
+            <div class="chain reveal" style="--d:310">
+              <div class="chain-item"><span class="mono">01</span><b>Изображение</b><small>матрица чисел</small></div>
+              <div class="chain-arrow">→</div>
+              <div class="chain-item"><span class="mono">02</span><b>Признаки</b><small>края, формы, текстуры</small></div>
+              <div class="chain-arrow">→</div>
+              <div class="chain-item"><span class="mono">03</span><b>Решение</b><small>класс, рамка, маска</small></div>
+            </div>
+          </div>
+
+          <div class="media-frame media-frame-tall reveal" style="--d:260">
+            <img src="assets/img/autonomous.webp" alt="Городская сцена с размеченными объектами: автомобили, пешеходы, велосипедист" loading="lazy">
+            <div class="media-shade"></div>
+            <div class="scan-sweep"></div>
+            <div class="media-hud media-hud-top">
+              <span class="mono">CAM_04 · NIGHT</span>
+              <span class="mono accent">60 FPS</span>
+            </div>
+            <div class="media-hud media-hud-bottom">
+              <span class="mono">1920 × 1080 × 3</span>
+              <span class="mono">= 6 220 800 чисел</span>
+            </div>
+            <div class="focus-box" style="left:38%;top:42%;width:20%;height:32%"><span class="mono">VEHICLE · 0.97</span></div>
+            <div class="focus-box focus-box-sm" style="left:17%;top:43%;width:7%;height:31%"><span class="mono">PERSON</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 03 · TASKS -->
+    <section class="slide" id="slide-3" data-title="Задачи компьютерного зрения" aria-label="Задачи компьютерного зрения">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">02 · задачи</p>
+            <h2 class="reveal" style="--d:130">Одна картинка —<br><span class="grad">четыре задачи</span></h2>
+          </div>
+          <p class="section-note reveal" style="--d:230">Чем сложнее ответ, тем больше информации должна вернуть модель.</p>
+        </div>
+
+        <div class="tasks-layout">
+          <div class="task-list reveal" style="--d:280" role="tablist" aria-label="Типы задач компьютерного зрения">
+            <button class="task-tab is-active" data-task="0" role="tab" aria-selected="true">
+              <span class="num">01</span>
+              <span><h3>Классификация</h3><p>Что изображено? Один объект — один класс.</p></span>
+            </button>
+            <button class="task-tab" data-task="1" role="tab" aria-selected="false">
+              <span class="num">02</span>
+              <span><h3>Локализация</h3><p>Где объект? Класс и прямоугольная рамка.</p></span>
+            </button>
+            <button class="task-tab" data-task="2" role="tab" aria-selected="false">
+              <span class="num">03</span>
+              <span><h3>Детектирование</h3><p>Что и где? Несколько объектов одновременно.</p></span>
+            </button>
+            <button class="task-tab" data-task="3" role="tab" aria-selected="false">
+              <span class="num">04</span>
+              <span><h3>Сегментация</h3><p>Где именно? Маска по каждому пикселю.</p></span>
+            </button>
+          </div>
+
+          <div class="task-view reveal" style="--d:360">
+            <div class="task-shot">
+              <div class="task-panels">
+                <figure class="task-panel is-active" data-panel="0">
+                  <img src="assets/tasks/method-1.webp" alt="Классификация: одна кошка на фотографии" loading="lazy">
+                  <figcaption><b>Классификация</b><span>что изображено?</span></figcaption>
+                </figure>
+                <figure class="task-panel" data-panel="1">
+                  <img src="assets/tasks/method-2.webp" alt="Локализация: кошка и прямоугольная рамка" loading="lazy">
+                  <figcaption><b>Локализация</b><span>где объект?</span></figcaption>
+                </figure>
+                <figure class="task-panel" data-panel="2">
+                  <img src="assets/tasks/method-3.webp" alt="Детектирование: кошка, собака и утка с рамками" loading="lazy">
+                  <figcaption><b>Детектирование</b><span>что и где?</span></figcaption>
+                </figure>
+                <figure class="task-panel" data-panel="3">
+                  <img src="assets/tasks/method-4.webp" alt="Сегментация: цветные маски объектов" loading="lazy">
+                  <figcaption><b>Сегментация</b><span>где именно?</span></figcaption>
+                </figure>
+              </div>
+              <div class="task-focus" id="task-focus"></div>
+            </div>
+            <div class="task-caption">
+              <span class="mono accent" id="task-code">CLASSIFICATION</span>
+              <p id="task-desc">Модель отвечает одним словом: «кошка». Этого достаточно, если объект один и занимает почти весь кадр.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 04 · APPLICATIONS -->
+    <section class="slide" id="slide-4" data-title="Где это работает" aria-label="Где применяется компьютерное зрение">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">03 · применение</p>
+            <h2 class="reveal" style="--d:130">Зрение уже работает вокруг нас</h2>
+          </div>
+          <p class="section-note reveal" style="--d:220">Один и тот же принцип — признаки → модель → решение — лежит в основе очень разных продуктов.</p>
+        </div>
+
+        <div class="apps-grid">
+          <article class="app-card reveal" style="--d:260">
+            <img src="assets/img/biometrics.webp" alt="Биометрическое распознавание лица" loading="lazy" style="object-position: 72% 34%">
+            <span class="app-index mono">01</span>
+            <div class="app-body"><h3>Биометрия</h3><p>Face ID, контроль доступа, верификация</p></div>
+          </article>
+          <article class="app-card reveal" style="--d:320">
+            <img src="assets/img/vacuum.webp" alt="Робот-пылесос с датчиками препятствий" loading="lazy">
+            <span class="app-index mono">02</span>
+            <div class="app-body"><h3>Роботы-пылесосы</h3><p>Навигация и объезд препятствий</p></div>
+          </article>
+          <article class="app-card reveal" style="--d:380">
+            <img src="assets/img/tram.webp" alt="Беспилотный трамвай" loading="lazy">
+            <span class="app-index mono">03</span>
+            <div class="app-body"><h3>Беспилотный транспорт</h3><p>Дорога, знаки, пешеходы</p></div>
+          </article>
+          <article class="app-card reveal" style="--d:440">
+            <img src="assets/img/anpr.webp" alt="Распознавание автомобильных номеров" loading="lazy">
+            <span class="app-index mono">04</span>
+            <div class="app-body"><h3>Распознавание номеров</h3><p>Парковки и контроль трафика</p></div>
+          </article>
+          <article class="app-card reveal" style="--d:500">
+            <img src="assets/img/documents.webp" alt="Сканирование документов и распознавание текста" loading="lazy">
+            <span class="app-index mono">05</span>
+            <div class="app-body"><h3>Документы и OCR</h3><p>Сканы, перевод, извлечение данных</p></div>
+          </article>
+          <article class="app-card reveal" style="--d:560">
+            <img src="assets/img/medicine.webp" alt="Анализ медицинских снимков" loading="lazy">
+            <span class="app-index mono">06</span>
+            <div class="app-body"><h3>Медицина</h3><p>МРТ, КТ, поиск аномалий</p></div>
+          </article>
+        </div>
+        <p class="apps-more mono reveal" style="--d:620">ещё: видеоаналитика · дефектоскопия · сельское хозяйство · ритейл · робототехника</p>
+      </div>
+    </section>
+
+    <!-- 05 · FEATURES -->
+    <section class="slide" id="slide-5" data-title="Как сеть ищет признаки" aria-label="Как свёртка ищет признаки на изображении">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">04 · признаки</p>
+            <h2 class="reveal" style="--d:130">Сеть не «видит» цифру.<br>Она собирает её <span class="grad">из признаков</span></h2>
+          </div>
+          <p class="section-note reveal" style="--d:220">Слой за слоем изображение превращается из набора яркостей в компактное описание объекта.</p>
+        </div>
+
+        <div class="feature-flow">
+          <div class="feature-stage reveal" style="--d:280">
+            <div class="feature-stage-head"><span class="mono">01 · вход</span><span class="mono muted">28×28</span></div>
+            <div class="feature-grid" id="feat-input" aria-hidden="true"></div>
+            <h3>Пиксели</h3><p>784 значения яркости</p>
+          </div>
+          <div class="feature-stage reveal" style="--d:360">
+            <div class="feature-stage-head"><span class="mono">02 · conv + relu</span><span class="mono muted">28×28</span></div>
+            <div class="feature-grid" id="feat-edge" aria-hidden="true"></div>
+            <h3>Линии и края</h3><p>свёртка ищет признаки на изображении</p>
+          </div>
+          <div class="feature-stage reveal" style="--d:440">
+            <div class="feature-stage-head"><span class="mono">03 · maxpool</span><span class="mono muted">7×7</span></div>
+            <div class="feature-grid feature-grid-pool" id="feat-pool" aria-hidden="true"></div>
+            <h3>Фрагменты</h3><p>дуги, петли, штрихи</p>
+          </div>
+          <div class="feature-result reveal" style="--d:520">
+            <span class="mono muted">04 · dense + softmax</span>
+            <div class="feature-answer"><strong>3</strong><span>98.7%</span></div>
+            <h3>Цифра</h3>
+            <p>Уверенность модели в классе «3».</p>
+            <div class="mini-bars" aria-hidden="true">
+              <i style="--w:2%"></i><i style="--w:1%"></i><i style="--w:98%"></i><i style="--w:1%"></i><i style="--w:2%"></i><i style="--w:1%"></i><i style="--w:1%"></i><i style="--w:2%"></i><i style="--w:1%"></i><i style="--w:1%"></i>
+            </div>
+            <div class="mini-labels mono"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span></div>
+          </div>
+        </div>
+        <p class="feature-note mono reveal" style="--d:600">каждый следующий слой отвечает за всё более абстрактный признак →</p>
+      </div>
+    </section>
+
+    <!-- 06 · NEURON -->
+    <section class="slide" id="slide-6" data-title="Как работает нейрон" aria-label="Как работает один нейрон">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">05 · нейрон</p>
+            <h2 class="reveal" style="--d:130">Не магия.<br><span class="grad">Математика над пикселями.</span></h2>
+          </div>
+          <p class="section-note reveal" style="--d:220">Нажмите на входы, чтобы увидеть, как меняется ответ.</p>
+        </div>
+
+        <div class="neuron-layout">
+          <div class="diagram-card reveal" style="--d:260">
+            <div class="diagram-head"><span class="mono">НЕЙРОН · СХЕМА</span><span class="live"><i></i>LIVE</span></div>
+            <svg class="neuron-svg" viewBox="0 0 660 400" role="img" aria-label="Схема нейрона: три входа, взвешенная сумма, функция активации и выход">
+              <defs>
+                <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#2a4b70"/><stop offset="1" stop-color="#4de2ff"/>
+                </linearGradient>
+                <filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              </defs>
+              <path id="np1" class="neuron-wire" d="M112 92 C 210 92, 240 180, 324 192"/>
+              <path id="np2" class="neuron-wire" d="M112 200 C 210 200, 248 200, 324 200"/>
+              <path id="np3" class="neuron-wire" d="M112 308 C 210 308, 240 220, 324 208"/>
+              <path class="neuron-wire" d="M404 200 H 470"/>
+              <path class="neuron-wire" d="M572 200 H 618"/>
+
+              <circle class="signal" r="3.5"><animateMotion dur="2.6s" repeatCount="indefinite"><mpath href="#np1"/></animateMotion></circle>
+              <circle class="signal" r="3.5"><animateMotion dur="2.2s" repeatCount="indefinite"><mpath href="#np2"/></animateMotion></circle>
+              <circle class="signal" r="3.5"><animateMotion dur="3s" repeatCount="indefinite"><mpath href="#np3"/></animateMotion></circle>
+
+              <g class="input-node">
+                <circle cx="80" cy="92" r="30"/><text x="80" y="99">A</text>
+                <text class="weight-label" x="150" y="82">× 0.9</text>
+              </g>
+              <g class="input-node">
+                <circle cx="80" cy="200" r="30"/><text x="80" y="207">B</text>
+                <text class="weight-label" x="150" y="190">× 0.4</text>
+              </g>
+              <g class="input-node">
+                <circle cx="80" cy="308" r="30"/><text x="80" y="315">C</text>
+                <text class="weight-label" x="150" y="298">× 0.7</text>
+              </g>
+
+              <g id="sum-node" class="op-node">
+                <circle cx="366" cy="200" r="40"/>
+                <text x="366" y="210" class="op-text">Σ</text>
+              </g>
+              <text class="formula-label" x="366" y="268" text-anchor="middle">z = Σ xᵢwᵢ − 0.2</text>
+
+              <g id="act-node" class="op-node act-node">
+                <rect x="470" y="150" width="102" height="100" rx="18"/>
+                <path d="M488 224 C 510 222, 512 178, 554 174" fill="none" stroke="#4de2ff" stroke-width="2.5"/>
+                <text x="521" y="242" text-anchor="middle" class="op-small">σ(z)</text>
+              </g>
+
+              <g id="out-node" class="out-node">
+                <circle cx="642" cy="200" r="30"/>
+                <text id="neuron-out-text" x="642" y="208">1</text>
+              </g>
+              <text class="formula-label" x="642" y="268" text-anchor="middle">выход</text>
+            </svg>
+          </div>
+
+          <div class="neuron-live reveal" style="--d:340">
+            <div class="live-head"><span class="mono">ВХОДЫ</span><span class="mono muted">0 / 1</span></div>
+            <div class="input-bits">
+              <button class="bit-btn is-on" data-bit="0" type="button"><span>A</span><b>1</b></button>
+              <button class="bit-btn" data-bit="1" type="button"><span>B</span><b>0</b></button>
+              <button class="bit-btn is-on" data-bit="2" type="button"><span>C</span><b>1</b></button>
+            </div>
+            <div class="calc-list">
+              <div class="calc-row"><span>Взвешенная сумма</span><strong id="z-val">1.40</strong></div>
+              <div class="calc-row"><span>σ(z) = 1 / (1 + e<sup>−z</sup>)</span><strong id="sig-val">0.80</strong></div>
+              <div class="calc-row"><span>Порог 0.5</span><strong class="accent" id="threshold-val">1</strong></div>
+            </div>
+            <div class="neuron-output">
+              <span class="mono muted">ВЫХОД НЕЙРОНА</span>
+              <div class="out-pill" id="neuron-output">1</div>
+            </div>
+            <p class="micro">Веса <b>0.9 · 0.4 · 0.7</b> и смещение <b>−0.2</b> — это параметры, которые сеть подбирает при обучении.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 07 · ACTIVATION -->
+    <section class="slide" id="slide-7" data-title="Функция активации" aria-label="Функции активации">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">06 · активация</p>
+            <h2 class="reveal" style="--d:130">Функция активации <span class="grad">добавляет нелинейность</span></h2>
+          </div>
+          <div class="segmented reveal" style="--d:220" role="tablist" aria-label="Тип функции активации">
+            <button class="seg is-active" data-act="sigmoid" role="tab" aria-selected="true">Sigmoid</button>
+            <button class="seg" data-act="relu" role="tab" aria-selected="false">ReLU</button>
+            <button class="seg" data-act="tanh" role="tab" aria-selected="false">Tanh</button>
+          </div>
+        </div>
+
+        <div class="act-layout">
+          <div class="chart-panel reveal" style="--d:260">
+            <div class="chart-panel-head">
+              <span class="mono" id="act-label">y = σ(x) = 1 / (1 + e⁻ˣ)</span>
+              <span class="mono muted" id="act-range">выход: 0…1</span>
+            </div>
+            <svg class="act-svg" id="act-svg" viewBox="0 0 600 390" role="img" aria-label="График функции активации">
+              <g id="act-grid"></g>
+              <path id="act-path" class="act-path" fill="none" stroke="url(#actGrad)" stroke-width="4" stroke-linecap="round"/>
+              <defs>
+                <linearGradient id="actGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#4f8cff"/><stop offset="1" stop-color="#4de2ff"/>
+                </linearGradient>
+              </defs>
+              <circle id="act-dot" class="act-dot" r="9"/>
+              <line id="act-guide" class="act-guide" y1="0" y2="0"/>
+            </svg>
+            <div class="chart-caption"><span>вход x</span><span id="act-dot-label">x = 1.4 → y = 0.80</span></div>
+            <div class="act-controls">
+              <span class="mono muted">ПОТЯНИТЕ ТОЧКУ ИЛИ ПОЛЗУНОК</span>
+              <input id="act-slider" type="range" min="-6" max="6" step="0.1" value="1.4" aria-label="Значение входа x">
+            </div>
+          </div>
+
+          <div class="act-copy">
+            <div class="fact-card reveal" style="--d:340">
+              <span class="fact-num mono">01</span>
+              <div><h3>Без нелинейности</h3><p>Сколько слоёв ни добавь, сеть останется одной большой линейной формулой.</p></div>
+            </div>
+            <div class="fact-card reveal" style="--d:410">
+              <span class="fact-num mono">02</span>
+              <div><h3>Sigmoid</h3><p>Сжимает любое число в диапазон 0…1. Удобно, когда нужна вероятность.</p></div>
+            </div>
+            <div class="fact-card reveal" style="--d:480">
+              <span class="fact-num mono">03</span>
+              <div><h3>ReLU</h3><p>max(0, z): отрицательные значения становятся нулём. Простая и быстрая — стандарт для свёрточных сетей.</p></div>
+            </div>
+            <div class="formula-strip reveal" style="--d:550">
+              <span class="mono">softmax</span>
+              <span>отдельная функция для выхода на 10 классов</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 08 · TRAINING -->
+    <section class="slide" id="slide-8" data-title="Как сеть обучается" aria-label="Как обучается нейронная сеть">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">07 · обучение</p>
+            <h2 class="reveal" style="--d:130">Сеть учится<br><span class="grad">на своих ошибках</span></h2>
+          </div>
+          <p class="section-note reveal" style="--d:220">Модель не программируют правилами. Её тренируют на примерах.</p>
+        </div>
+
+        <div class="train-layout">
+          <div class="cycle reveal" style="--d:260">
+            <svg viewBox="0 0 600 600" aria-hidden="true">
+              <circle class="cycle-track" cx="300" cy="300" r="215"/>
+              <circle class="cycle-progress" cx="300" cy="300" r="215"/>
+              <circle class="orbit-dot" r="6">
+                <animateMotion dur="7s" repeatCount="indefinite" path="M300,85 a215,215 0 1,1 -0.1,0"/>
+              </circle>
+            </svg>
+            <div class="cycle-core">
+              <span class="mono muted">ЭПОХА</span>
+              <strong id="train-epoch">01 / 10</strong>
+              <div class="loss-line"><span>loss</span><b id="train-loss">2.31</b></div>
+              <div class="loss-track"><i id="train-bar"></i></div>
+            </div>
+            <div class="cycle-node n1"><span class="mono">01</span><b>Данные</b><small>batch 128</small></div>
+            <div class="cycle-node n2"><span class="mono">02</span><b>Предсказание</b><small>forward pass</small></div>
+            <div class="cycle-node n3"><span class="mono">03</span><b>Ошибка</b><small>cross-entropy</small></div>
+            <div class="cycle-node n4"><span class="mono">04</span><b>Градиент</b><small>backprop</small></div>
+            <div class="cycle-node n5"><span class="mono">05</span><b>Веса</b><small>Adam</small></div>
+          </div>
+
+          <div class="train-copy">
+            <div class="train-step reveal" style="--d:340"><span class="mono">forward</span><div><h3>Сеть делает предположение</h3><p>Изображение проходит через слои, на выходе — 10 вероятностей.</p></div></div>
+            <div class="train-step reveal" style="--d:400"><span class="mono">loss</span><div><h3>Считаем ошибку</h3><p>Сравниваем ответ с правильной меткой. Ошибка — одно число.</p></div></div>
+            <div class="train-step reveal" style="--d:460"><span class="mono">backprop</span><div><h3>Ищем виноватых</h3><p>Градиент показывает, как изменить каждый вес, чтобы ошибка стала меньше.</p></div></div>
+            <div class="train-step reveal" style="--d:520"><span class="mono">update</span><div><h3>Делаем шаг</h3><p>Оптимизатор Adam чуть-чуть меняет веса. И всё повторяется.</p></div></div>
+            <div class="train-quote reveal" style="--d:580">10 эпох · 54 000 примеров в обучении · 6 000 на валидации</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 09 · COLOR -->
+    <section class="slide" id="slide-9" data-title="Как сеть видит цвет" aria-label="Как нейронная сеть видит цветное изображение">
+      <div class="slide-inner">
+        <div class="split color-split">
+          <div class="copy">
+            <p class="kicker reveal" style="--d:60">08 · цвет</p>
+            <h2 class="reveal" style="--d:130">Цветное изображение —<br><span class="grad">это три матрицы</span></h2>
+            <p class="lead reveal" style="--d:220">Для компьютера нет «красивого заката». Есть высота, ширина и три канала: красный, зелёный, синий. Каждый пиксель каждого канала — число от 0 до 255.</p>
+            <div class="color-facts reveal" style="--d:310">
+              <div class="color-fact"><strong>3</strong><span>канала</span></div>
+              <div class="color-fact"><strong>8</strong><span>бит на канал</span></div>
+              <div class="color-fact"><strong>16.7M</strong><span>цветов</span></div>
+            </div>
+            <div class="tensor-badge reveal" style="--d:390"><span class="mono">тензор</span><b>H × W × 3</b><span class="mono muted">высота × ширина × каналы</span></div>
+          </div>
+
+          <div class="rgb-demo reveal" style="--d:280">
+            <div class="rgb-original">
+              <img src="assets/img/rgb-photo.webp" alt="Горный пейзаж — исходное цветное изображение" loading="lazy">
+              <span class="rgb-crosshair"></span>
+              <span class="rgb-pixel mono">R 198 · G 134 · B 86</span>
+              <span class="channel-tag mono">ИСХОДНИК</span>
+            </div>
+            <div class="rgb-equals">=</div>
+            <div class="rgb-channels">
+              <div class="channel ch-r"><img src="assets/img/rgb-r.webp" alt="Красный канал изображения" loading="lazy"><span class="mono">R · c=1</span></div>
+              <div class="channel ch-g"><img src="assets/img/rgb-g.webp" alt="Зелёный канал изображения" loading="lazy"><span class="mono">G · c=2</span></div>
+              <div class="channel ch-b"><img src="assets/img/rgb-b.webp" alt="Синий канал изображения" loading="lazy"><span class="mono">B · c=3</span></div>
+            </div>
+          </div>
+        </div>
+        <p class="color-note mono reveal" style="--d:460">в памяти: не «картинка», а массив чисел → свёртка работает с каждым каналом</p>
+      </div>
+    </section>
+
+    <!-- 10 · GRAYSCALE -->
+    <section class="slide" id="slide-10" data-title="Как сеть видит ч/б" aria-label="Как нейронная сеть видит чёрно-белое изображение">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">09 · ч/б</p>
+            <h2 class="reveal" style="--d:130">Чёрно-белая картинка —<br><span class="grad">одна матрица</span></h2>
+          </div>
+          <p class="section-note reveal" style="--d:220">Наведите на пиксель: значение можно прочитать.</p>
+        </div>
+
+        <div class="gray-layout">
+          <div class="gray-visual reveal" style="--d:260">
+            <div class="gray-frame">
+              <div class="pixel-grid pixel-grid-lg" id="gray-grid" aria-hidden="true"></div>
+              <div class="scanline"></div>
+              <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+            </div>
+            <div class="gray-inspector">
+              <div><span class="mono muted">ПИКСЕЛЬ</span><strong class="mono" id="pixel-coord">[14, 9]</strong></div>
+              <div><span class="mono muted">ЗНАЧЕНИЕ</span><strong class="accent" id="pixel-value">254</strong></div>
+              <div><span class="mono muted">НОРМА</span><strong id="pixel-norm">1.00</strong></div>
+            </div>
+          </div>
+
+          <div class="gray-copy">
+            <div class="gray-fact reveal" style="--d:340">
+              <span class="mono">28 × 28</span>
+              <div><strong>784 пикселя</strong><p>Каждый пиксель — яркость от 0 до 255.</p></div>
+            </div>
+            <div class="gray-fact reveal" style="--d:400">
+              <span class="mono">0 / 255</span>
+              <div><strong>чёрный / белый</strong><p>Один канал вместо трёх — в 3 раза меньше данных.</p></div>
+            </div>
+            <div class="gray-fact reveal" style="--d:460">
+              <span class="mono">÷ 255</span>
+              <div><strong>нормализация</strong><p>Перед обучением приводим значения к диапазону 0…1.</p></div>
+            </div>
+            <div class="patch-card reveal" style="--d:520">
+              <div class="patch-head"><span class="mono">ФРАГМЕНТ 5×5</span><span class="mono muted">окрестность</span></div>
+              <div class="patch-grid" id="patch-grid" aria-hidden="true"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 11 · MNIST -->
+    <section class="slide" id="slide-11" data-title="MNIST: постановка задачи" aria-label="База данных MNIST и постановка задачи">
+      <div class="slide-inner">
+        <div class="split mnist-split">
+          <div class="copy">
+            <p class="kicker reveal" style="--d:60">10 · данные</p>
+            <h2 class="reveal" style="--d:130">MNIST:<br><span class="grad">70 000 рукописных цифр</span></h2>
+            <p class="lead reveal" style="--d:220">База Национального института стандартов и технологий США. Уже разбита на обучающую и тестовую выборки, потому что модель не должна видеть тест во время обучения.</p>
+            <div class="mnist-stats reveal" style="--d:300">
+              <div class="stat-card"><strong data-count="60000">60 000</strong><span>обучающих</span></div>
+              <div class="stat-card"><strong data-count="10000">10 000</strong><span>тестовых</span></div>
+              <div class="stat-card"><strong data-count="10">10</strong><span>классов</span></div>
+              <div class="stat-card"><strong data-count="784">784</strong><span>пикселя</span></div>
+            </div>
+            <div class="task-badge reveal" style="--d:380"><span class="mono">задача</span><b>классификация</b><span>28×28×1 → одна из 10 цифр</span></div>
+          </div>
+          <div class="mnist-shot reveal" style="--d:280">
+            <div class="mnist-shot-head"><span class="mono">MNIST · SAMPLE GRID</span><span class="mono accent">0…9</span></div>
+            <img src="assets/img/mnist-grid.webp" alt="Сетка примеров рукописных цифр из MNIST" loading="lazy">
+            <div class="mnist-shot-foot"><span class="mono">каждый пример — 28×28</span><span class="mono">10 классов</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 12 · ARCHITECTURE -->
+    <section class="slide" id="slide-12" data-title="Структура CNN" aria-label="Структура свёрточной нейронной сети">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">11 · архитектура</p>
+            <h2 class="reveal" style="--d:130">От чтения картинки<br><span class="grad">до предсказания</span></h2>
+          </div>
+          <p class="section-note reveal" style="--d:220">Чередуем свёртки и pooling, затем сглаживаем признаки и классифицируем.</p>
+        </div>
+
+        <div class="arch-flow reveal" style="--d:280">
+          <div class="arch-node arch-input"><span class="mono">INPUT</span><strong>28×28×1</strong><small>784 значения</small></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node arch-conv"><span class="mono">CONV 3×3</span><strong>32 карты</strong><small>ReLU</small></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node arch-pool"><span class="mono">MAXPOOL</span><strong>2×2</strong><small>14×14</small></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node arch-conv"><span class="mono">CONV 3×3</span><strong>64 карты</strong><small>ReLU</small></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node arch-pool"><span class="mono">MAXPOOL</span><strong>2×2</strong><small>5×5</small></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node arch-flat"><span class="mono">FLATTEN</span><strong>1600</strong><small>вектор</small></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node arch-dense"><span class="mono">DENSE</span><strong>128</strong><small>ReLU</small></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node arch-out"><span class="mono">SOFTMAX</span><strong>10</strong><small>вероятности</small></div>
+        </div>
+
+        <div class="arch-meta reveal" style="--d:380">
+          <div class="meta-pill"><span class="mono">параметры</span><b>225 034</b></div>
+          <div class="meta-pill"><span class="mono">эпохи</span><b>10</b></div>
+          <div class="meta-pill"><span class="mono">batch</span><b>128</b></div>
+          <div class="meta-pill"><span class="mono">оптимизатор</span><b>Adam</b></div>
+          <div class="meta-pill"><span class="mono">dropout</span><b>0.25 / 0.5</b></div>
+        </div>
+        <p class="arch-note reveal" style="--d:450">Dropout случайно «выключает» часть нейронов — это защищает сеть от переобучения.</p>
+      </div>
+    </section>
+
+    <!-- 13 · CONVOLUTION -->
+    <section class="slide" id="slide-13" data-title="Слой свёртки" aria-label="Как работает слой свёртки">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">12 · свёртка</p>
+            <h2 class="reveal" style="--d:130">Ядро 3×3 скользит по изображению<br><span class="grad">и ищет признак</span></h2>
+          </div>
+          <p class="section-note reveal" style="--d:220">Каждое положение окна даёт одно число в карте признаков.</p>
+        </div>
+
+        <div class="conv-layout reveal" style="--d:260">
+          <div class="conv-panel">
+            <div class="panel-head"><span class="mono">ВХОД · 14×14</span><span class="mono muted" id="conv-pos">окно 1 / 144</span></div>
+            <div class="conv-input" id="conv-input" aria-label="Входная матрица 14 на 14"></div>
+          </div>
+          <div class="kernel-panel">
+            <div class="panel-head"><span class="mono">ЯДРО</span><span class="mono muted">3×3</span></div>
+            <div class="kernel" id="conv-kernel" aria-label="Ядро свёртки"></div>
+            <div class="kernel-caption">скользит слева направо, сверху вниз</div>
+          </div>
+          <div class="conv-panel">
+            <div class="panel-head"><span class="mono">КАРТА ПРИЗНАКОВ · 12×12</span><span class="mono muted">отклик</span></div>
+            <div class="conv-output" id="conv-output" aria-label="Карта признаков 12 на 12"></div>
+          </div>
+        </div>
+
+        <div class="conv-bottom reveal" style="--d:340">
+          <div class="conv-controls">
+            <button class="btn btn-primary" id="conv-play" type="button">Пауза</button>
+            <button class="btn" id="conv-step" type="button">Шаг</button>
+            <button class="btn" id="conv-reset" type="button">Сброс</button>
+            <span class="control-divider"></span>
+            <button class="btn btn-kernel is-active" data-kernel="vertical" type="button">вертикали</button>
+            <button class="btn btn-kernel" data-kernel="horizontal" type="button">горизонтали</button>
+            <button class="btn btn-kernel" data-kernel="outline" type="button">контур</button>
+          </div>
+          <div class="conv-formula mono">
+            <span>Σ (окно × ядро)</span>
+            <b id="conv-raw">—</b>
+            <span class="muted">→</span>
+            <b class="accent" id="conv-value">—</b>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 14 · POOLING -->
+    <section class="slide" id="slide-14" data-title="MaxPooling" aria-label="Слой MaxPooling">
+      <div class="slide-inner">
+        <div class="split pool-split">
+          <div class="copy">
+            <p class="kicker reveal" style="--d:60">13 · сжатие</p>
+            <h2 class="reveal" style="--d:130">MaxPooling<br><span class="grad">оставляет самые сильные признаки</span></h2>
+            <p class="lead reveal" style="--d:220">Окно 2×2 выбирает максимум. Карта признаков уменьшается в 4 раза, но самые яркие отклики остаются.</p>
+            <div class="pool-facts reveal" style="--d:300">
+              <div><strong>36 → 9</strong><span>значений</span></div>
+              <div><strong>−75%</strong><span>вычислений</span></div>
+              <div><strong>2×2</strong><span>окно</span></div>
+            </div>
+            <div class="relu-note reveal" style="--d:380">
+              <span class="mono">перед pooling</span>
+              <p><b>ReLU</b> обнуляет отрицательные отклики — в pooling попадают только полезные признаки.</p>
+            </div>
+          </div>
+
+          <div class="pool-demo reveal" style="--d:320">
+            <div class="pool-panel">
+              <div class="panel-head"><span class="mono">ВХОД · 6×6</span><span class="mono muted" id="pool-pos">окно 1 / 9</span></div>
+              <div class="pool-grid" id="pool-input"></div>
+            </div>
+            <div class="pool-arrow">→</div>
+            <div class="pool-panel">
+              <div class="panel-head"><span class="mono">ВЫХОД · 3×3</span><span class="mono muted" id="pool-max">max</span></div>
+              <div class="pool-grid pool-out" id="pool-output"></div>
+            </div>
+            <div class="pool-controls">
+              <button class="btn btn-primary" id="pool-play" type="button">Пауза</button>
+              <button class="btn" id="pool-step" type="button">Шаг</button>
+              <button class="btn" id="pool-reset" type="button">Сброс</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 15 · SOFTMAX -->
+    <section class="slide" id="slide-15" data-title="Softmax" aria-label="Функция Softmax">
+      <div class="slide-inner">
+        <div class="split softmax-split">
+          <div class="copy">
+            <p class="kicker reveal" style="--d:60">14 · вероятности</p>
+            <h2 class="reveal" style="--d:130">Softmax превращает<br><span class="grad">числа в вероятности</span></h2>
+            <p class="lead reveal" style="--d:220">Сеть не говорит «это точно 3». Она говорит, насколько уверена в каждом из 10 классов. Сумма вероятностей всегда равна 1.</p>
+            <div class="softmax-formula reveal" style="--d:300">
+              <span class="mono">P(class i) =</span>
+              <span class="frac"><i>e<sup>zᵢ</sup></i><span>Σ e<sup>zⱼ</sup></span></span>
+            </div>
+            <div class="softmax-sample reveal" style="--d:380">
+              <div class="sample-thumb" id="softmax-thumb"></div>
+              <div>
+                <span class="mono muted">ПРИМЕР</span>
+                <div class="sample-buttons">
+                  <button class="seg is-active" data-sample="3" type="button">цифра 3</button>
+                  <button class="seg" data-sample="7" type="button">цифра 7</button>
+                </div>
+              </div>
+            </div>
+            <p class="micro reveal" style="--d:450">Logits — «сырые» выходы последнего слоя. Softmax делает из них распределение.</p>
+          </div>
+
+          <div class="softmax-bars reveal" style="--d:320">
+            <div class="bars-head"><span class="mono">ВЫХОД · 10 КЛАССОВ</span><span class="mono muted">Σ = <b id="softmax-sum">1.000</b></span></div>
+            <div class="bars" id="softmax-bars">
+              <div class="bar-row" data-class="0"><span class="mono">0</span><div class="bar-track"><i class="bar-fill"></i></div><b class="bar-val">0.0%</b></div>
+              <div class="bar-row" data-class="1"><span class="mono">1</span><div class="bar-track"><i class="bar-fill"></i></div><b class="bar-val">0.0%</b></div>
+              <div class="bar-row" data-class="2"><span class="mono">2</span><div class="bar-track"><i class="bar-fill"></i></div><b class="bar-val">0.0%</b></div>
+              <div class="bar-row" data-class="3"><span class="mono">3</span><div class="bar-track"><i class="bar-fill"></i></div><b class="bar-val">0.0%</b></div>
+              <div class="bar-row" data-class="4"><span class="mono">4</span><div class="bar-track"><i class="bar-fill"></i></div><b class="bar-val">0.0%</b></div>
+              <div class="bar-row" data-class="5"><span class="mono">5</span><div class="bar-track"><i class="bar-fill"></i></div><b class="bar-val">0.0%</b></div>
+              <div class="bar-row" data-class="6"><span class="mono">6</span><div class="bar-track"><i class="bar-fill"></i></div><b class="bar-val">0.0%</b></div>
+              <div class="bar-row" data-class="7"><span class="mono">7</span><div class="bar-track"><i class="bar-fill"></i></div><b class="bar-val">0.0%</b></div>
+              <div class="bar-row" data-class="8"><span class="mono">8</span><div class="bar-track"><i class="bar-fill"></i></div><b class="bar-val">0.0%</b></div>
+              <div class="bar-row" data-class="9"><span class="mono">9</span><div class="bar-track"><i class="bar-fill"></i></div><b class="bar-val">0.0%</b></div>
+            </div>
+            <div class="bars-foot"><span class="mono muted">самый вероятный класс</span><b class="accent" id="softmax-top">3 · 96.8%</b></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 16 · RESULTS -->
+    <section class="slide" id="slide-16" data-title="Проверка на тесте" aria-label="Результаты обучения модели">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">15 · результат</p>
+            <h2 class="reveal" style="--d:130">Как сеть справилась<br><span class="grad">с новыми цифрами</span></h2>
+          </div>
+          <p class="section-note reveal" style="--d:220">Точность на данных, которые модель никогда не видела при обучении.</p>
+        </div>
+
+        <div class="results-layout">
+          <div class="charts reveal" style="--d:260">
+            <div class="chart-card">
+              <div class="chart-head"><span class="mono">ТОЧНОСТЬ</span><span class="mono muted">выше — лучше</span></div>
+              <svg class="chart-svg" id="chart-acc" viewBox="0 0 420 190" role="img" aria-label="График точности обучения и проверки"></svg>
+            </div>
+            <div class="chart-card">
+              <div class="chart-head"><span class="mono">ОШИБКА</span><span class="mono muted">ниже — лучше</span></div>
+              <svg class="chart-svg" id="chart-loss" viewBox="0 0 420 190" role="img" aria-label="График ошибки обучения и проверки"></svg>
+            </div>
+          </div>
+
+          <div class="results-side">
+            <div class="result-stats reveal" style="--d:340">
+              <div class="result-stat"><strong>99.1<span>%</span></strong><span class="mono">test accuracy</span></div>
+              <div class="result-stat"><strong>0.029</strong><span class="mono">test loss</span></div>
+              <div class="result-stat"><strong>225k</strong><span class="mono">параметров</span></div>
+              <div class="result-stat"><strong>10</strong><span class="mono">эпох</span></div>
+            </div>
+            <div class="prediction-card reveal" style="--d:420">
+              <div class="prediction-head"><span class="mono">ПРОВЕРКА ПРЕДСКАЗАНИЙ</span><span class="mono accent">6 примеров</span></div>
+              <div class="prediction-grid">
+                <div class="pred correct"><img src="assets/img/d-3-3.webp" alt="Цифра 3"><span class="mono">3 → 3</span><i>✓</i></div>
+                <div class="pred correct"><img src="assets/img/d-2-7.webp" alt="Цифра 7"><span class="mono">7 → 7</span><i>✓</i></div>
+                <div class="pred correct"><img src="assets/img/d-5-8.webp" alt="Цифра 8"><span class="mono">8 → 8</span><i>✓</i></div>
+                <div class="pred correct"><img src="assets/img/d-6-4.webp" alt="Цифра 4"><span class="mono">4 → 4</span><i>✓</i></div>
+                <div class="pred wrong"><img src="assets/img/d-1-5.webp" alt="Цифра 5"><span class="mono">5 → 6</span><i>×</i></div>
+                <div class="pred correct"><img src="assets/img/d-2-8.webp" alt="Цифра 8"><span class="mono">8 → 8</span><i>✓</i></div>
+              </div>
+              <div class="prediction-foot"><span class="mono">модель ошибается примерно на 1 из 100 цифр</span></div>
+            </div>
+            <div class="code-strip reveal" style="--d:500"><span class="mono">model.evaluate(X_test, Y_test)</span><b>0.9914</b></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 17 · DRAW -->
+    <section class="slide" id="slide-17" data-title="Цифра глазами сети" aria-label="Интерактив: нарисуйте цифру и посмотрите на вход нейронной сети">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">16 · практика</p>
+            <h2 class="reveal" style="--d:130">Посмотрите на цифру<br><span class="grad">глазами нейронной сети</span></h2>
+          </div>
+          <p class="section-note reveal" style="--d:220">Рисуйте мышью или пальцем. Мы сразу превратим рисунок в матрицу 28×28.</p>
+        </div>
+
+        <div class="draw-layout">
+          <div class="draw-pad reveal" style="--d:260">
+            <div class="draw-pad-head"><span class="mono">ХОЛСТ · 280×280</span><span class="mono accent" id="draw-status">рисуйте</span></div>
+            <div class="draw-stage">
+              <canvas id="draw-canvas" width="560" height="560" aria-label="Холст для рисования цифры"></canvas>
+              <div class="draw-grid-lines" aria-hidden="true"></div>
+            </div>
+            <div class="draw-actions">
+              <button class="draw-btn" id="draw-clear" type="button">Очистить</button>
+              <button class="draw-btn" id="draw-sample" type="button">Пример</button>
+              <span class="mono muted">кисть ≈ 20 px</span>
+            </div>
+          </div>
+
+          <div class="draw-side">
+            <div class="draw-preview-card reveal" style="--d:340">
+              <div class="draw-preview-head"><span class="mono">ВХОД СЕТИ · 28×28</span><span class="mono muted">0…255</span></div>
+              <div class="draw-preview" id="draw-preview" aria-hidden="true"></div>
+              <div class="draw-preview-foot"><span class="mono">средняя яркость</span><b id="draw-norm">0.00</b></div>
+            </div>
+
+            <div class="draw-result reveal" style="--d:420">
+              <div class="draw-result-head"><span class="mono">ПОХОЖЕ НА</span><span class="mono accent" id="draw-class">—</span></div>
+              <div class="draw-bars" id="draw-bars"></div>
+              <p class="draw-note">Демо сравнивает рисунок с 10 шаблонами MNIST. Настоящая CNN выучивает признаки сама — как в ноутбуке.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 18 · COLAB -->
+    <section class="slide" id="slide-18" data-title="Google Colab: разбираем код" aria-label="Переход в Google Colab и разбор кода">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">17 · ноутбук</p>
+            <h2 class="reveal" style="--d:130">Теперь — в Google Colab.<br><span class="grad">Посмотрим на код.</span></h2>
+          </div>
+          <p class="section-note reveal" style="--d:220">Теория закончилась. Открываем ноутбук и собираем модель руками.</p>
+        </div>
+
+        <div class="colab-layout">
+          <div class="colab-main reveal" style="--d:260">
+            <div class="colab-mark"><i></i><i></i><i></i><i></i><i></i></div>
+            <div>
+              <span class="mono colab-label">ПРАКТИКА · 20–30 МИНУТ</span>
+              <h3>Открыть Colab и пройти ноутбук</h3>
+              <p>Откройте ноутбук по кнопке ниже, включите GPU и выполните ячейки по порядку.</p>
+            </div>
+            <ol class="colab-steps">
+              <li><span class="mono">01</span><div><b>Данные</b><small>mnist.load_data()</small></div></li>
+              <li><span class="mono">02</span><div><b>Подготовка</b><small>нормализация и one-hot</small></div></li>
+              <li><span class="mono">03</span><div><b>Модель</b><small>Conv → Pool → Dense</small></div></li>
+              <li><span class="mono">04</span><div><b>Обучение</b><small>10 эпох, batch 128</small></div></li>
+            </ol>
+            <a class="colab-btn" href="https://colab.research.google.com/github/nebolsinvasili/MS/blob/master/%D0%9C_%D0%9A%D0%BB%D0%B0%D1%81%D1%81%D0%B8%D1%84%D0%B8%D0%BA%D0%B0%D1%86%D0%B8%D1%8F%20%D0%B8%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B9.ipynb" target="_blank" rel="noopener">
+              <span>Открыть ноутбук в Colab</span><b>↗</b>
+            </a>
+            <div class="colab-links">
+              <span class="colab-hint mono">Runtime → Change runtime type → T4 GPU</span>
+              <a class="colab-download mono" href="%D0%9C_%D0%9A%D0%BB%D0%B0%D1%81%D1%81%D0%B8%D1%84%D0%B8%D0%BA%D0%B0%D1%86%D0%B8%D1%8F%20%D0%B8%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B9.ipynb" download>↓ скачать .ipynb</a>
+            </div>
+          </div>
+
+          <div class="colab-code">
+            <div class="code-card reveal" style="--d:320">
+              <div class="code-card-head"><span class="mono">01 · ДАННЫЕ</span><span class="mono muted">python</span></div>
+              <pre><code><span class="c-kw">from</span> tensorflow.keras.datasets <span class="c-kw">import</span> mnist
+
+(X_train, y_train), (X_test, y_test) = mnist.load_data()
+X_train = X_train.astype(<span class="c-str">"float32"</span>) / <span class="c-num">255.0</span>
+X_test  = X_test.astype(<span class="c-str">"float32"</span>) / <span class="c-num">255.0</span></code></pre>
+            </div>
+            <div class="code-card reveal" style="--d:380">
+              <div class="code-card-head"><span class="mono">02 · МОДЕЛЬ</span><span class="mono muted">python</span></div>
+              <pre><code>model = Sequential([
+  Conv2D(<span class="c-num">32</span>, (<span class="c-num">3</span>,<span class="c-num">3</span>), activation=<span class="c-str">"relu"</span>,
+         input_shape=(<span class="c-num">28</span>,<span class="c-num">28</span>,<span class="c-num">1</span>)),
+  MaxPooling2D((<span class="c-num">2</span>,<span class="c-num">2</span>)),
+  Conv2D(<span class="c-num">64</span>, (<span class="c-num">3</span>,<span class="c-num">3</span>), activation=<span class="c-str">"relu"</span>),
+  MaxPooling2D((<span class="c-num">2</span>,<span class="c-num">2</span>)),
+  Flatten(), Dense(<span class="c-num">128</span>, activation=<span class="c-str">"relu"</span>),
+  Dense(<span class="c-num">10</span>, activation=<span class="c-str">"softmax"</span>)
+])</code></pre>
+            </div>
+            <div class="code-card reveal" style="--d:440">
+              <div class="code-card-head"><span class="mono">03 · ОБУЧЕНИЕ</span><span class="mono muted">python</span></div>
+              <pre><code>model.compile(loss=<span class="c-str">"categorical_crossentropy"</span>,
+              optimizer=<span class="c-str">"adam"</span>, metrics=[<span class="c-str">"accuracy"</span>])
+
+history = model.fit(X_train, Y_train,
+                    epochs=<span class="c-num">10</span>, batch_size=<span class="c-num">128</span>,
+                    validation_split=<span class="c-num">0.1</span>)</code></pre>
+            </div>
+            <div class="code-card code-card-result reveal" style="--d:500">
+              <div class="code-card-head"><span class="mono">04 · ПРОВЕРКА</span><span class="mono muted">python</span></div>
+              <pre><code>test_loss, test_acc = model.evaluate(X_test, Y_test)
+<span class="c-com"># accuracy ≈ 0.991, loss ≈ 0.029</span></code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 19 · WORKSHOP TASKS -->
+    <section class="slide" id="slide-19" data-title="Задачи мастер-класса" aria-label="Практические задачи мастер-класса">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">18 · задачи</p>
+            <h2 class="reveal" style="--d:130">Что нужно сделать<br>на мастер-классе</h2>
+          </div>
+          <p class="section-note reveal" style="--d:220">Отмечайте выполненные шаги. Главное — не просто запустить код, а объяснить результат.</p>
+        </div>
+
+        <div class="work-grid">
+          <button class="work-card reveal" style="--d:280" type="button" aria-pressed="false">
+            <span class="work-check" aria-hidden="true">✓</span>
+            <span class="work-num mono">01</span>
+            <strong>Обучить базовую CNN</strong>
+            <p>Запустить ноутбук на 10 эпохах и записать accuracy и loss на тесте.</p>
+            <span class="work-goal mono">цель: ≥ 98% accuracy</span>
+          </button>
+          <button class="work-card reveal" style="--d:340" type="button" aria-pressed="false">
+            <span class="work-check" aria-hidden="true">✓</span>
+            <span class="work-num mono">02</span>
+            <strong>Сравнить ядра свёртки</strong>
+            <p>Проверить вертикали, горизонтали и контур. Объяснить, какие признаки выделяет каждое.</p>
+            <span class="work-goal mono">цель: 3 разные карты признаков</span>
+          </button>
+          <button class="work-card reveal" style="--d:400" type="button" aria-pressed="false">
+            <span class="work-check" aria-hidden="true">✓</span>
+            <span class="work-num mono">03</span>
+            <strong>Поймать переобучение</strong>
+            <p>Сравнить 5 и 20 эпох. Найти момент, когда val_loss начинает расти.</p>
+            <span class="work-goal mono">цель: объяснить gap train/val</span>
+          </button>
+          <button class="work-card reveal" style="--d:460" type="button" aria-pressed="false">
+            <span class="work-check" aria-hidden="true">✓</span>
+            <span class="work-num mono">04</span>
+            <strong>Добавить аугментацию</strong>
+            <p>Включить сдвиги и небольшие повороты. Сравнить точность на «кривых» цифрах.</p>
+            <span class="work-goal mono">цель: рост устойчивости</span>
+          </button>
+        </div>
+
+        <div class="work-foot reveal" style="--d:540">
+          <span class="mono">ПРОГРЕСС</span>
+          <div class="work-progress"><i id="work-progress-bar"></i></div>
+          <b class="mono" id="work-progress-text">0 / 4</b>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- 20 · QUIZ -->
+    <section class="slide" id="slide-20" data-title="Проверим, что запомнили" aria-label="Проверка: что вы смогли запомнить">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">19 · проверка</p>
+            <h2 class="reveal" style="--d:130">Проверим,<br><span class="grad">что вы смогли запомнить</span></h2>
+          </div>
+          <p class="section-note reveal" style="--d:220">Выберите ответ — сразу увидите объяснение. В конце — самопроверка.</p>
+        </div>
+
+        <div class="quiz-grid" id="quiz-grid"></div>
+
+        <div class="quiz-foot reveal" style="--d:520">
+          <div class="quiz-score-wrap"><span class="mono">РЕЗУЛЬТАТ</span><b id="quiz-score">0 / 5</b></div>
+          <p class="quiz-feedback" id="quiz-feedback">Выберите ответ в каждом вопросе.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 21 · SELF-CHECK -->
+    <section class="slide" id="slide-21" data-title="Самопроверка" aria-label="Итоговая самопроверка">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">20 · самопроверка</p>
+            <h2 class="reveal" style="--d:130" id="self-title"><span id="self-title-main">Самопроверка:</span><br><span class="grad" id="self-title-sub">что уже получается?</span></h2>
+          </div>
+          <p class="section-note reveal" style="--d:220">Отметьте то, что можете объяснить своими словами.</p>
+        </div>
+
+        <div class="self-grid">
+          <div class="self-score-card reveal" style="--d:280">
+            <span class="mono">ТЕСТ · 5 ВОПРОСОВ</span>
+            <strong id="self-score">0 / 5</strong>
+            <p id="self-verdict">Пройдите пять вопросов — здесь появится результат.</p>
+            <button class="draw-btn" id="self-restart" type="button">Пройти заново</button>
+          </div>
+
+          <div class="self-list reveal" style="--d:340" id="self-checklist">
+            <label><input type="checkbox"><span>Я объясню, почему изображение — это матрица чисел.</span></label>
+            <label><input type="checkbox"><span>Я отличу свёртку от MaxPooling.</span></label>
+            <label><input type="checkbox"><span>Я понимаю, зачем нужен Softmax.</span></label>
+            <label><input type="checkbox"><span>Я назову, как сеть подбирает веса по ошибке.</span></label>
+            <label><input type="checkbox"><span>Я знаю, как проверить переобучение.</span></label>
+            <div class="self-list-foot"><span class="mono">ОТМЕЧЕНО</span><b class="mono" id="self-check-count">0 / 5</b></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 22 · CONCLUSIONS -->
+    <section class="slide" id="slide-22" data-title="Выводы" aria-label="Выводы мастер-класса">
+      <div class="slide-inner">
+        <div class="section-head">
+          <div>
+            <p class="kicker reveal" style="--d:60">21 · итог</p>
+            <h2 class="reveal" style="--d:130">Теперь вы знаете,<br><span class="grad">как видит машина</span></h2>
+          </div>
+          <p class="section-note reveal" style="--d:220">Пять идей, которые стоит забрать с мастер-класса.</p>
+        </div>
+
+        <div class="conclusions-grid">
+          <article class="conclusion-card reveal" style="--d:280">
+            <span class="mono">01</span>
+            <h3>Изображение — это данные</h3>
+            <p>Для сети картинка — матрица чисел. Чёрно-белая цифра 28×28 — это 784 значения, цветная — уже три матрицы.</p>
+          </article>
+          <article class="conclusion-card reveal" style="--d:340">
+            <span class="mono">02</span>
+            <h3>Признаки выучивает сеть</h3>
+            <p>Края, штрихи и формы не программируют вручную: свёрточные слои находят их сами в процессе обучения.</p>
+          </article>
+          <article class="conclusion-card reveal" style="--d:400">
+            <span class="mono">03</span>
+            <h3>Свёртка и pooling</h3>
+            <p>Ядро скользит по изображению и ищет локальный признак, а pooling оставляет самые сильные признаки и уменьшает размер.</p>
+          </article>
+          <article class="conclusion-card reveal" style="--d:460">
+            <span class="mono">04</span>
+            <h3>На выходе — вероятности</h3>
+            <p>Softmax превращает десять чисел в распределение вероятностей. Сумма всегда равна единице.</p>
+          </article>
+          <article class="conclusion-card reveal" style="--d:520">
+            <span class="mono">05</span>
+            <h3>Ошибки — часть работы</h3>
+            <p>99% — это не 100%. Проверяйте модель на тесте, смотрите на неверные примеры и следите за переобучением.</p>
+          </article>
+        </div>
+
+        <div class="recap reveal" style="--d:580">
+          <span><b>01</b> пиксели</span><span class="recap-arrow">→</span>
+          <span><b>02</b> признаки</span><span class="recap-arrow">→</span>
+          <span><b>03</b> свёртки</span><span class="recap-arrow">→</span>
+          <span><b>04</b> вероятности</span><span class="recap-arrow">→</span>
+          <span><b>05</b> обучение</span>
+        </div>
+
+        <div class="final-thanks reveal" style="--d:620">
+          <span class="mono">спасибо за внимание</span>
+          <p>Если остались вопросы, загуглите)))</p>
+        </div>
+
+        <div class="author-contacts reveal" style="--d:700">
+          <div class="author-id">
+            <img src="assets/img/logo-untc.png" alt="УИТС" class="author-logo">
+            <div>
+              <span class="mono">Небольсин Василий Дмитриевич</span>
+              <small>автор мастер-класса</small>
+            </div>
+          </div>
+          <div class="author-links">
+            <a class="author-link" href="https://t.me/nebolsinvasili" target="_blank" rel="noopener" aria-label="Telegram" title="Telegram">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.6 4.2 2.9 11.4c-1 .4-1 1 .1 1.3l4.7 1.5 1.8 5.5c.2.6.4.7 1 .3l2.7-2 5 3.7c.9.5 1.5.2 1.7-.8l3.1-14.6c.2-.9-.3-1.3-1.4-1.1Zm-13 8.9 9-5.7c.4-.2.8 0 .5.3l-7.6 6.9-.3 3.2-1.6-4.7Z"/></svg>
+            </a>
+            <a class="author-link" href="https://vk.com/nebolsinvasili" target="_blank" rel="noopener" aria-label="ВКонтакте" title="ВКонтакте">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.2 17.7c-5.6 0-8.8-3.8-9-10.1h2.8c.1 4.6 2.1 6.6 3.7 7V7.6h2.7v4c1.6-.2 3.2-2 3.8-4h2.7c-.4 2.4-2 4.2-3.2 4.9 1.2.6 3 2.1 3.7 5.2h-3c-.5-1.7-1.9-3-3.9-3.2v3.2h-.3Z"/></svg>
+            </a>
+            <a class="author-link" href="mailto:nebolsinvasili@gmail.com" aria-label="Электронная почта" title="nebolsinvasili@gmail.com">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m4 7 8 6 8-6"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="hud">
+    <div class="progress"><i id="progress-bar"></i></div>
+    <div class="hud-left mono"><span id="slide-number">01</span><span class="hud-sep">/</span><span id="slide-total">22</span></div>
+    <div class="hud-title" id="hud-title">Титул</div>
+    <div class="hud-right">
+      <span class="hud-hint mono">← → · space</span>
+      <button class="round-btn" id="prev-btn" type="button" aria-label="Предыдущий слайд">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <button class="round-btn" id="next-btn" type="button" aria-label="Следующий слайд">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+  </footer>
+
+  <div class="overview" id="overview" aria-hidden="true">
+    <div class="overview-head">
+      <div><p class="kicker">навигация</p><h2>Все слайды</h2></div>
+      <button class="round-btn" id="overview-close" type="button" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="overview-grid" id="overview-grid"></div>
+  </div>
+
+  <div class="help-modal" id="help-modal" aria-hidden="true">
+    <div class="help-card">
+      <div class="help-head"><div><p class="kicker">управление</p><h2>Горячие клавиши</h2></div><button class="round-btn" id="help-close" type="button" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <div class="keys">
+        <div><kbd>→</kbd><kbd>Space</kbd><span>следующий слайд</span></div>
+        <div><kbd>←</kbd><span>предыдущий слайд</span></div>
+        <div><kbd>O</kbd><span>все слайды</span></div>
+        <div><kbd>F</kbd><span>полный экран</span></div>
+        <div><kbd>B</kbd><span>чёрный экран</span></div>
+        <div><kbd>Esc</kbd><span>закрыть / выйти</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="blackout" id="blackout" aria-hidden="true"></div>
+  <div class="sr-only" id="live" aria-live="polite"></div>
+
+  <script src="js/digits.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

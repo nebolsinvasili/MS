@@ -1,0 +1,10 @@
+# Сценарий мастер-класса (не публикуется)
+Сценарий_мастер-класса.md
+
+# Служебное
+.DS_Store
+Thumbs.db
+*.log
+__pycache__/
+.ipynb_checkpoints/
+node_modules/
