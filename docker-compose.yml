@@ -1,0 +1,10 @@
+services:
+  deck:
+    build: .
+    image: ms-deck:latest
+    container_name: ms-deck
+    ports:
+      # 8080 на всех интерфейсах: по этому порту сайт доступен
+      # и с ноутбука, и с телефонов в той же Wi-Fi сети.
+      - "8080:80"
+    restart: unless-stopped
